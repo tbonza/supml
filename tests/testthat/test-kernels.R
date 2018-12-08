@@ -20,7 +20,7 @@ test_that("valid homophily kernel scenario 1 with k=1", {
     m1 <- matrix(FALSE, nrow=3, ncol=3)
     m1[,2] <- TRUE
 
-    expect_true(homophily_kern(2,2,m1,1))
+    expect_true(kblock_kern(2,2,m1,1))
 })
 
 test_that("valid homophily kernel scenario 2 with k=1", {
@@ -28,7 +28,7 @@ test_that("valid homophily kernel scenario 2 with k=1", {
     m2 <- matrix(FALSE, nrow=3, ncol=3)
     m2[2,2] <-  TRUE; m2[2,3] <- TRUE
 
-    expect_true(homophily_kern(2,2,m2,1))
+    expect_true(kblock_kern(2,2,m2,1))
 })
 
 test_that("valid homophily kernel scenario 3 with k=1", {
@@ -36,7 +36,7 @@ test_that("valid homophily kernel scenario 3 with k=1", {
     m3 <- matrix(FALSE, nrow=3, ncol=3)
     m3[2,2] <- TRUE
 
-    expect_false(homophily_kern(2,2,m3,1))
+    expect_false(kblock_kern(2,2,m3,1))
 })
 
 test_that("valid homophily kernel scenario 4 with k=1", {
@@ -44,7 +44,7 @@ test_that("valid homophily kernel scenario 4 with k=1", {
     m4 <- matrix(FALSE, nrow=3, ncol=3)
     m4[c(1,3), 1] <- TRUE; m4[c(1,3), 3] <- TRUE
 
-    expect_false(homophily_kern(2,2,m4,1))
+    expect_false(kblock_kern(2,2,m4,1))
 })
 
 

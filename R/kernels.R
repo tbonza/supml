@@ -15,7 +15,7 @@ gauss_kern <- function(x, mu, lambda){
     return(c(w))
 }
 
-#' Homophily Kernel
+#' K-Block Kernel
 #'
 #' Special case of a kernel used for estimating spatial
 #' relationships to assess similarity of geographically
@@ -35,7 +35,7 @@ gauss_kern <- function(x, mu, lambda){
 #' @return TRUE if window exists, otherwise FALSE
 #'
 #' @export
-homophily_kern <- function(i,j, m, k){
+kblock_kern <- function(i,j, m, k){
     nrow_m <- nrow(m)
     ncol_m <- ncol(m)
 
