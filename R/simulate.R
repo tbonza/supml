@@ -1,6 +1,8 @@
 #` Functions used for simulating various distributions
 
 #' Simulate a random normal distribution on an interval
+#'
+#' @import stats
 #' @export
 nsim <- function(low, high, N){
     m <- ((high - low) / 2) + low
@@ -9,7 +11,7 @@ nsim <- function(low, high, N){
     iterations <- 0
 
     while (converged == FALSE){
-        d <- rnorm(n=N, mean=m, sd=s)
+        d <- stats::rnorm(n=N, mean=m, sd=s)
 
         if (length(d[d > low & d < high]) == N) {
             converged <- TRUE
@@ -51,28 +53,30 @@ create_outliers <- function(x){
 #'
 #' Cleaner implementation from the TA's answer key
 #'
+#' @import stats
 #' @return list, attribute matrix, target vector
 #' @export
 data_simulator <- function() {
-    X <- runif(50, -2, 2)
-    Y <- 2 + 3*X + rnorm(50, 0, 2)
+    X <- stats::runif(50, -2, 2)
+    Y <- 2 + 3*X + stats::rnorm(50, 0, 2)
     return(list(X=X, Y=Y))
 }
 
 
 #' Simulate Bernoulli distribution from HW3
 #'
+#' @import stats
 #' @return list, attribute matrix, target vector
 #' @export
 bernoulli_sim <- function(){
     N <- 50
-    X1 <- runif(N, 0, 3)
-    X2 <- runif(N, 0, 3)
+    X1 <- stats::runif(N, 0, 3)
+    X2 <- stats::runif(N, 0, 3)
 
     p <- 1 / (1 + exp(1) - (-3 + X1 + X2))
 
-    Y <- rbinom(N, 1, p)
+    Y <- stats::rbinom(N, 1, p)
 
     return(list(X1=X1, X2=X2, Y=Y))    
 }
-3
+

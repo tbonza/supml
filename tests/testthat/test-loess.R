@@ -17,14 +17,6 @@ test_that("weighted least squares is correct", {
     expect_equal(round(tcof[2,], 3), round(ans$theta[2], 3))
 })
 
-test_that("Gaussian kernel is correct", {
-    
-    ans <- gauss_kern(x, mean(x), sd(x))
-
-    expect_equal(nrow(x), length(ans))
-})
-
-
 test_that("Loess regression is correct", {
 
     # run baseline loess regression model
