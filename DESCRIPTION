@@ -1,0 +1,18 @@
+Package: supml
+Title: "Algorithms for Supervised Machine Learning"
+Author: Tyler Brown [aut, cre]
+Maintainer: Tyler Brown <tylers.pile@gmail.com>
+Version: 0.0.0.9000
+Authors@R:
+    person(given = "Tyler",
+           family = "Brown",
+           role = c("aut", "cre"),
+           email = "tylers.pile@gmail.com")
+Description: Provides supervised machine learning algorithms unrelated to Neural Networks
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 6.0.1
+Suggests: testthat
+Imports: e1071
