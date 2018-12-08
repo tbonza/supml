@@ -22,6 +22,5 @@ w vector of weights
 Compute the logistic gradient with learning rate alpha
 }
 \examples{
-TODO
 
 }

@@ -51,6 +51,8 @@ mae <- function(e, delta=0.0){ sum(abs(e)) }
 #'
 #' @examples
 #' huber_cond(0, 0.01) == TRUE
+#'
+#' @export
 huber_cond <- function(i, delta) { all(abs(i) <= delta) }
 
 #' Huber Loss function (smooth mean absolute error) with parameter delta

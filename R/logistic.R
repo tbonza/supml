@@ -28,7 +28,6 @@ lgm_gradient <- function(w, X, t){ t(X) %*% (lgm_yhat(w, X) - t) }
 #' @return w vector of weights
 #'
 #' @examples
-#' TODO
 #'
 #' @export
 logistic_gradient <- function(X, t, w, alpha){

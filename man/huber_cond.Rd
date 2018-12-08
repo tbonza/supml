@@ -22,4 +22,5 @@ use with \code{\link{sapply}} and
 }
 \examples{
 huber_cond(0, 0.01) == TRUE
+
 }
