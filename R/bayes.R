@@ -2,15 +2,16 @@
 
 # Generic methods
 
-predict_proba <- function(obj, X) { UseMethod("predict_proba") }
+predict_proba <- function(object, X) { UseMethod("predict_proba") }
 
-fit <- function(obj, X, y) { UseMethod("fit") }
+fit <- function(object, X, y) { UseMethod("fit") }
 
-kernelDensity <- function(obj, x, mu=0) { UseMethod("kernelDensity") }
+kernelDensity <- function(object, x, kernel, ...) {
+    UseMethod("kernelDensity") }
 
-score <- function(obj, y, probs) { UseMethod("score") }
+score <- function(object, y, probs) { UseMethod("score") }
 
-gridSearch <- function(obj, X, y, ...) { UseMethod("gridSearch") }
+gridSearch <- function(object, X, y, ...) { UseMethod("gridSearch") }
 
 #' Bayesian object
 #'
@@ -22,9 +23,8 @@ gridSearch <- function(obj, X, y, ...) { UseMethod("gridSearch") }
 #' @return s3 object, bayes
 #'
 #' @export
-bayes <- function(lambda, kernel="gaussian"){
-    value <- list(lambda = lambda, kernel = kernel,
-                  classes = c(), models = list(),
+bayes <- function(){
+    value <- list(classes = c(), models = list(),
                   logpriors = c())
     attr(value, "class") <- "bayes"
     return(value)
@@ -32,28 +32,48 @@ bayes <- function(lambda, kernel="gaussian"){
 
 # Bayesian methods
 
-#' Gaussian Kernel Density Estimate for Naive Bayes
+#' Kernel Density Estimate for Naive Bayes
 #' 
-#' Implements HT (6.23)
+#' Implements HT (6.23), implements K-Block kernel
 #'
-#' @param obj requires instantiated Bayes object
-#' @param x continuous feature vector
-#' @return fhat, point estimate with gaussian kernel
+#' @param object requires instantiated Bayes object
+#' @param x feature vector
+#' @param kernel name of kernel ("gaussian", "kblock")
+#' @param ... kernel specific arguments
+#' @return kernel estimate
 #'
 #' @export
-kernelDensity.bayes <- function(obj, x, mu=0){
-    lambda <- obj$lambda
-    kernel <- obj$kernel # assume gaussian for now
+kernelDensity.bayes <- function(object, x, kernel, ...){
 
-    if (!is.null(nrow(x))) { N <- nrow(x) }
-    else { N <- length(x) }
+    arg = list(...)
+
+    if (kernel == "gaussian"){
+
+        if (!is.null(nrow(x))) { N <- nrow(x) }
+        else { N <- length(x) }
     
-    estimates <- sapply(x, gauss_kern, mu, lambda)
-    fhat <- sum(estimates) / N
+        mu <- arg$mu
+        lambda <- arg$lambda
+    
+        estimates <- sapply(x, gauss_kern, mu, lambda)
+        fhat <- sum(estimates) / N
+        
+        return(fhat)
+    }
+    else if (kernel == "kblock"){
+        # count of number of k blocks existing within x
+        j <- arg$j
+        k <- arg$k
+        m <- arg$m
 
-    return(fhat)
+        estimates <- sapply(x, kblock_kern, j=j, m=m, k=k)
+        xk <- sum(estimates)
+        
+        return(xk)
+    }
+    else { stop("Unknown kernel specified") }
 }
- 
+
 
 #' Fit training data to Bayesian Classifier
 #'
@@ -62,23 +82,23 @@ kernelDensity.bayes <- function(obj, x, mu=0){
 #' variables. We also need the log priors
 #' to avoid issues with floating point.
 #'
-#' @param obj bayes s3 object
+#' @param object bayes s3 object
 #' @param X feature matrix
 #' @param y target vector
 #' @return obj updated bayes s3 object
 #'
 #' @export
-fit.bayes <- function(obj, X, y){
+fit.bayes <- function(object, X, y){
 
     # Classes
 
     if (!is.factor(y)) { stop("y must be of type Factor") }
-    obj$classes <- levels(y)
+    object$classes <- levels(y)
 
     # Define training sets
 
     training_sets <- list()
-    for (yi in obj$classes){ training_sets[[yi]] <- X[y == yi,] }
+    for (yi in object$classes){ training_sets[[yi]] <- X[y == yi,] }
     
     # Models
 
@@ -93,7 +113,7 @@ fit.bayes <- function(obj, X, y){
         kmodels <- list()
         klogpriors <- list()
 
-        # p(c)
+        # compute prior probabilities, p(c)
 
         p_c <- paste0("p(", name, ")")
         kmodels[[p_c]] <- sum(y == name) / length(y)
@@ -111,7 +131,8 @@ fit.bayes <- function(obj, X, y){
 
                 # Log prior
 
-                klogpriors[[j]] <- log(ifelse(kmodels[[p_xc]] == 1, 0.99, kmodels[[p_xc]]))
+                klogpriors[[j]] <- log(ifelse(kmodels[[p_xc]] == 1, 0.99,
+                                              kmodels[[p_xc]]))
             }
         
             # Continuous 
@@ -141,10 +162,10 @@ fit.bayes <- function(obj, X, y){
         
     }
 
-    obj$models <- models
-    obj$logpriors <- logpriors
+    object$models <- models
+    object$logpriors <- logpriors
     
-    return(obj)
+    return(object)
 }
 
 lookup <- function(name, cond=FALSE){
@@ -221,9 +242,8 @@ predict_proba.bayes <- function(obj, X){
 #' @return s3 object bayes with prediction attribute
 #'
 #' @export
-predict.bayes <- function(object, ...){
-
-    X <- list(...)$X
+predict.bayes <- function(object, X){
+    
     obj <- object
 
     # Log probabilties for each feature by class
