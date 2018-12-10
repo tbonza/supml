@@ -6,6 +6,8 @@ predict_proba <- function(object, X) { UseMethod("predict_proba") }
 
 fit <- function(object, X, y) { UseMethod("fit") }
 
+spatialProbs <- function(object, X,y) { UseMethod("spatialProbs") }
+
 kernelDensity <- function(object, x, kernel, ...) {
     UseMethod("kernelDensity") }
 
@@ -18,13 +20,12 @@ gridSearch <- function(object, X, y, ...) { UseMethod("gridSearch") }
 #' Used for Bayesian classification with kernel 
 #' density estimation
 #'
-#' @param lambda kernel bin width
-#' @param kernel, string name of kernel to use
+#' @param map list of variable types for X
 #' @return s3 object, bayes
 #'
 #' @export
-bayes <- function(){
-    value <- list(classes = c(), models = list(),
+bayes <- function(map){
+    value <- list(map = map, classes = c(), models = list(),
                   logpriors = c())
     attr(value, "class") <- "bayes"
     return(value)
@@ -67,13 +68,63 @@ kernelDensity.bayes <- function(object, x, kernel, ...){
         m <- arg$m
 
         estimates <- sapply(x, kblock_kern, j=j, m=m, k=k)
-        xk <- sum(estimates)
         
-        return(xk)
+        return(estimates)
     }
     else { stop("Unknown kernel specified") }
 }
 
+#' Intermediate Fitting step for Spatial data
+spatialProbs.bayes <- function(object, X, y){
+
+    # Manually set priors due to imbalanced classes
+
+    spatial_priors <- object$map$spatial_priors
+    kernel <- object$map$kernels['spatial']
+    k <- object$map$kblocks
+
+    # Compute kernel block count
+
+    i <- 1:nrow(X)
+    blocks <- matrix(nrow=nrow(X), ncol=ncol(X))
+    for (j in 1:ncol(X)){
+
+        estimates <- kernelDensity(object, x=i, kernel=kernel,
+                                   m=X, j=j, k=k)
+
+        blocks[,j] <- estimates
+    }
+
+    # Compute prior times conditional probs for each class in y
+
+    lnprobs <- list()
+    for (label in object$classes){
+
+        ksum <- sum(blocks[y==label,])
+        tsum <- sum(X[y==label,])
+
+        if (ksum == 0 | tsum == 0){
+            lnprob <- log(0.0001)
+        }
+        else if (ksum == tsum){
+            lnprob <- log(0.9999)
+        }
+        else {
+            lnprob <- log(ksum) - log(tsum)
+        }
+        lnprobs[[label]] <- log(spatial_priors[[label]]) + lnprob
+    }
+    
+    return(lnprobs)
+}
+
+#' Intermediate Fitting step for Continuous data
+continuous_probs.bayes <- function(object, X, y){
+}
+
+#' Intermediate Fitting step for Categorical data
+categorical_probs.bayes <- function(object, X,y){
+}
 
 #' Fit training data to Bayesian Classifier
 #'
@@ -95,76 +146,15 @@ fit.bayes <- function(object, X, y){
     if (!is.factor(y)) { stop("y must be of type Factor") }
     object$classes <- levels(y)
 
-    # Define training sets
+    spatial_cols <- object$map$spatial
+    categorical_cols <- object$map$categorical
+    continuous_cols <- object$map$continuous
 
-    training_sets <- list()
-    for (yi in object$classes){ training_sets[[yi]] <- X[y == yi,] }
-    
-    # Models
+    # Process spatial data
 
-    N <- length(y)
-    models <- list()
-    logpriors <- list()
-    
-    for (name in names(training_sets)){
 
-        Xc <- training_sets[[name]]
+    # Process continuous and categorical data
 
-        kmodels <- list()
-        klogpriors <- list()
-
-        # compute prior probabilities, p(c)
-
-        p_c <- paste0("p(", name, ")")
-        kmodels[[p_c]] <- sum(y == name) / length(y)
-
-        for (j in 1:ncol(Xc)){
- 
-            Xtrain <- Xc[,j]
-
-            # Categorical Variable
-
-            if (is.factor(Xc[,j])){
-
-                p_xc <- paste0("p(", j, "|c)")
-                kmodels[[p_xc]] <- (sum(Xtrain == name))  / sum(y == name)
-
-                # Log prior
-
-                klogpriors[[j]] <- log(ifelse(kmodels[[p_xc]] == 1, 0.99,
-                                              kmodels[[p_xc]]))
-            }
-        
-            # Continuous 
-
-            else if (is.numeric(Xc[,j])){
-
-                # p(x|c)
-
-                p_xc <- paste0("p(", j, "|c)")
-                kmodels[[p_xc]] <- Xc[,j]
-
-                # Log prior
-
-                pr <- (length(Xtrain)) / N
-                klogpriors[[j]] <- log(ifelse(pr == 1, 0.99, pr))
-            }
-
-            # Otherwise, error
-
-            else {
-             stop(sprintf("X vector %.0f is not a Factor or Numeric type", j))
-            }            
-        }
-
-        models[[name]] <- kmodels
-        logpriors[[name]] <- klogpriors
-        
-    }
-
-    object$models <- models
-    object$logpriors <- logpriors
-    
     return(object)
 }
 
