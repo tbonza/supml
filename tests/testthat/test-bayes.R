@@ -127,7 +127,7 @@ test_that("bayes can fit spatial data", {
     expect_equal(ans[[b$classes[1]]], log(0.9999))
 })
 
-test_that("bayes can fit continuous data", {
+test_that("bayes can fit categorical data", {
 
     # bayes object
     map = list(spatial=c(), continuous=c(), categorical=c(),
@@ -135,6 +135,8 @@ test_that("bayes can fit continuous data", {
                hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
     b = bayes(map)
     b$classes <- levels(y)
+
+    
 })
 
 # Tests related to prior probability intermediate model fitting steps
