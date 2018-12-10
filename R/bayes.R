@@ -264,14 +264,13 @@ fit.bayes <- function(object, X, y){
     object$classes <- levels(y)
 
     spatial_cols <- object$map$spatial
-    continuous_cols <- object$map$continuous
-    categorical_cols <- object$map$categorical
 
     logprobs <- list()
 
     # Compute conditional probs for spatial data
 
-    logprobs[['spatial']] <- spatialProbs(object, X[,spatial_cols], y)
+    logprobs[['spatial']] <- spatialProbs(object,
+                                          as.matrix(X[,spatial_cols]), y)
 
     # Compute conditional probs for continuous data
 

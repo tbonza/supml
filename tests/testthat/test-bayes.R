@@ -193,23 +193,31 @@ test_that("find prior probabilities for continuous/categorical data", {
 
 test_that("bayesian model can be fitted", {
 
-    lambda <- 0.5
-    b <- bayes(map=list())
+    # Combine dataframe to include all three
+    # types of variables. 
 
-    #ans <- fit(b, X, y)
+    df <- as.data.frame(m1)
+    df <- cbind(df, c(1:nrow(m1)), factor(c("1","0","0")))
+    colnames(df) <-  paste0("V", as.character(1:ncol(df)))
 
-    skip("Not yet ready")
-    expect_equal(class(ans), "bayes")
-    expect_equal(ans$lambda, lambda)
-    expect_equal(ans$kernel, "gaussian")
-    expect_equal(ans$classes, levels(y))
-    expect_equal(length(ans$models), 2)
-    expect_equal(length(ans$logpriors), 2)
 
-    # check specifics
+    # construct bayes object
 
-    expect_equal(length(ans$models[['1']]), ncol(X) + 1)
-    expect_equal(length(ans$logpriors[['1']]), ncol(X))
+    map = list(spatial=c(1:ncol(m1)), continuous=c(ncol(m1) + 1),
+               categorical=c(ncol(m1) + 2),
+               kernels=c(spatial="kblock", continuous="gaussian"),
+               spatial_priors=list("1"=0.5,"0"=0.5),
+               hyperparameters=c(lambda=0.5, kblocks=1))
 
+    b <- bayes(map)
+
+    ans <- fit(b, X=df, y=ys)
+    print(ans)
+
+    expect_equal(length(ans), 4)
+    expect_equal(length(ans$logpriors$spatial), 2)
+    expect_equal(length(ans$logpriors$priors), 2)
+    expect_equal(length(ans$logpriors$categorical), 4)
+    expect_equal(length(ans$logpriors$continuous), 2)
 })
 
