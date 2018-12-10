@@ -1,6 +1,12 @@
 context("bayes")
 
 
+# Constants used for bayesian classifier
+
+LOGMIN <- 0.0001
+LOGMAX <- 0.9999
+
+
 # Simulated test data
 
 y <- factor(c("0","0","1","1","0"))
@@ -99,14 +105,15 @@ test_that("bayes kblock kernel density, scenario 4",{
     expect_equal(sum(ans), 0)
 })
 
-# Tests related to intermediate model fitting steps
+# Tests related to conditional probability intermediate model fitting steps
 
 test_that("bayes can fit spatial data", {
 
     # bayes object
     map = list(spatial=c(1:ncol(m1)), continuous=c(), categorical=c(),
                kernels=c(spatial="kblock", continuous="gaussian"),
-               spatial_priors=list("1"=0.5,"0"=0.5), kblocks=1)
+               spatial_priors=list("1"=0.5,"0"=0.5),
+               hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
     b = bayes(map)
     b$classes <- levels(ys)
 
@@ -117,7 +124,44 @@ test_that("bayes can fit spatial data", {
     # check log probabilities (should be equal)
 
     expect_equal(ans[[b$classes[1]]], ans[[b$classes[1]]])
-    expect_equal(ans[[b$classes[1]]], log(0.9999) + log(0.5))
+    expect_equal(ans[[b$classes[1]]], log(0.9999))
+})
+
+test_that("bayes can fit continuous data", {
+
+    # bayes object
+    map = list(spatial=c(), continuous=c(), categorical=c(),
+               kernels=c(spatial="kblock", continuous="gaussian"),
+               hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
+    b = bayes(map)
+    b$classes <- levels(y)
+})
+
+# Tests related to prior probability intermediate model fitting steps
+
+test_that("find prior probabilities for continuous/categorical data", {
+
+    # Check LOGMAX
+
+    b <- bayes(map=list())
+    y1 <- factor(c("1","1"))
+    ans1 <- priorProbs(b,y1)
+    expect_equal(ans1[1,2], log(LOGMAX))
+
+    # Check LOGMIN when only one class is present
+
+    b <- bayes(map=list())
+    y2 <- factor(c("0"))
+    ans2 <- priorProbs(b,y2)
+    expect_equal(ans2[1,2], log(LOGMIN))
+
+    # Check general case
+
+    b <- bayes(map=list())
+    y3 <- factor(c("0","1","1"))
+    ans3 <- priorProbs(b,y3)
+    expect_equal(ans3[1,2], log(LOGMIN))
+    expect_equal(ans3[2,2], log(2) - log(3))
 })
 
 

@@ -1,4 +1,9 @@
-#' Implement Naive Bayes
+#' Implement Naive Bayes Classifier
+
+# Constants used for Bayesian classifier
+
+LOGMIN <- 0.0001
+LOGMAX <- 0.9999
 
 # Generic methods
 
@@ -7,6 +12,9 @@ predict_proba <- function(object, X) { UseMethod("predict_proba") }
 fit <- function(object, X, y) { UseMethod("fit") }
 
 spatialProbs <- function(object, X,y) { UseMethod("spatialProbs") }
+continuousProbs <- function(object, X, y) { UseMethod("continuousProbs") }
+categoricalProbs <- function(object, X, y) { UseMethod("categoricalProbs") }
+priorProbs <- function(object, y) { UseMethod("priorProbs") }
 
 kernelDensity <- function(object, x, kernel, ...) {
     UseMethod("kernelDensity") }
@@ -26,7 +34,7 @@ gridSearch <- function(object, X, y, ...) { UseMethod("gridSearch") }
 #' @export
 bayes <- function(map){
     value <- list(map = map, classes = c(), models = list(),
-                  logpriors = c())
+                  logpriors = list())
     attr(value, "class") <- "bayes"
     return(value)
 }
@@ -74,14 +82,23 @@ kernelDensity.bayes <- function(object, x, kernel, ...){
     else { stop("Unknown kernel specified") }
 }
 
-#' Intermediate Fitting step for Spatial data
+#' Conditional probability fitting step for Spatial data
+#'
+#' This method should only be used for customizing your
+#' own Bayesian classifier.
+#' 
+#' @param object bayesian s3 object with mappings set
+#' @param X boolean spatial feature matrix
+#' @param y target vector, factor
+#' @return natural log probabilities for each class in y
+#'
+#' @export
 spatialProbs.bayes <- function(object, X, y){
 
-    # Manually set priors due to imbalanced classes
+    # Retrieve hyperparameters
 
-    spatial_priors <- object$map$spatial_priors
     kernel <- object$map$kernels['spatial']
-    k <- object$map$kblocks
+    k <- object$map$hyperparameters['kblocks']
 
     # Compute kernel block count
 
@@ -95,7 +112,7 @@ spatialProbs.bayes <- function(object, X, y){
         blocks[,j] <- estimates
     }
 
-    # Compute prior times conditional probs for each class in y
+    # Compute conditional probs for each class in y
 
     lnprobs <- list()
     for (label in object$classes){
@@ -104,34 +121,78 @@ spatialProbs.bayes <- function(object, X, y){
         tsum <- sum(X[y==label,])
 
         if (ksum == 0 | tsum == 0){
-            lnprob <- log(0.0001)
+            lnprob <- log(LOGMIN)
         }
         else if (ksum == tsum){
-            lnprob <- log(0.9999)
+            lnprob <- log(LOGMAX)
         }
         else {
             lnprob <- log(ksum) - log(tsum)
         }
-        lnprobs[[label]] <- log(spatial_priors[[label]]) + lnprob
+        lnprobs[[label]] <- lnprob
     }
     
     return(lnprobs)
 }
 
-#' Intermediate Fitting step for Continuous data
-continuous_probs.bayes <- function(object, X, y){
+#' Conditional probability fitting step for Continuous data
+#'
+#' Compute conditional probs for each class in y
+#' for each column j. This method should only be 
+#' used for customizing your own Bayesian classifier.
+#' 
+#' @param object bayesian s3 object with mappings set
+#' @param X continuous feature matrix
+#' @param y target vector, factor
+#' @return natural log probabilities for each class in y
+#'
+#' @export
+continuousProbs.bayes <- function(object, X, y){
+
+    # Retrieve hyperparameters
+
+    kernel <- object$map$kernels['continuous']
+
+    for (label in object$classes){
+
+        Xtrain <- X[y == label,]
+        
+        for (j in 1:ncol(Xtrain)){
+
+            Xtrain[,j]
+        }
+    }
 }
 
-#' Intermediate Fitting step for Categorical data
-categorical_probs.bayes <- function(object, X,y){
+#' Conditional probability fitting step for Categorical data
+#'
+categoricalProbs.bayes <- function(object, X, y){
+}
+
+#' 
+priorProbs.bayes <- function(object, y) {
+
+    y_count <- as.data.frame(table(y))
+    y_len <- length(y)
+
+    y_count['logprobs'] <- log(y_count$Freq) - log(y_len)
+    y_count['logprobs'][y_count$Freq == y_len,] <- log(LOGMAX)
+    y_count['logprobs'][y_count$Freq == 1,] <- log(LOGMIN)
+
+    priors <- as.data.frame(y_count$y)
+    priors <- cbind(priors, y_count$logprobs)
+    colnames(priors) <- c("y", "logprobs")
+    
+    return(priors)
 }
 
 #' Fit training data to Bayesian Classifier
 #'
 #' We want to assign models to each class,
 #' accounting for continuous and categorical
-#' variables. We also need the log priors
-#' to avoid issues with floating point.
+#' variables. We also handle spatial data.
+#' Log priors are used to avoide issues with
+#' floating point.
 #'
 #' @param object bayes s3 object
 #' @param X feature matrix
@@ -147,13 +208,32 @@ fit.bayes <- function(object, X, y){
     object$classes <- levels(y)
 
     spatial_cols <- object$map$spatial
-    categorical_cols <- object$map$categorical
     continuous_cols <- object$map$continuous
+    categorical_cols <- object$map$categorical
 
-    # Process spatial data
+    logprobs <- list()
 
+    # Compute conditional probs for spatial data
 
-    # Process continuous and categorical data
+    logprobs[['spatial']] <- spatialProbs(object, X[,spatial_cols], y)
+
+    # Compute conditional probs for continuous data
+
+    logprobs[['continuous']] <- continuousProbs(object,
+                                                X[,continuous_cols], y)
+
+    # Compute conditional probs for categorical data
+
+    logprobs[['categorical']] <- categoricalProbs(object,
+                                                  X[,categorical_cols], y)
+
+    # Compute priors for continuous & categorical data
+    
+    logprobs[['priors']] <- priorProbs(object, y)
+
+    # Cache log prior and conditional probabilities
+
+    object$logpriors <- logprobs
 
     return(object)
 }
