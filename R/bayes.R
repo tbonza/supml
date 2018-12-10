@@ -12,6 +12,7 @@ predict_proba <- function(object, X) { UseMethod("predict_proba") }
 fit <- function(object, X, y) { UseMethod("fit") }
 
 spatialProbs <- function(object, X,y) { UseMethod("spatialProbs") }
+continuousProbs <- function(object, X, y) { UseMethod("continuousProbs") }
 categoricalProbs <- function(object, X, y) { UseMethod("categoricalProbs") }
 priorProbs <- function(object, y) { UseMethod("priorProbs") }
 
@@ -134,9 +135,42 @@ spatialProbs.bayes <- function(object, X, y){
     return(lnprobs)
 }
 
-#' Conditional probability fitting step for Categorical data
+#' Conditional probability fitting step for Continuous data
 #'
-categoricalProbs.bayes <- function(object, X, y){
+#' Only 'gaussian' kernel currently supported. Gaussian kernel
+#' requies mean mu given y in addition to the priors for y. The
+#' Gaussian kernel standard deviation is specified by hyperparameter
+#' lambda and not required for conditional probability computation.
+#' Priors for y are computed for the model rather than duplicated for
+#' each continuous feature j. 
+#'
+#' This method should only be used for customizing your own
+#' Bayesian classifier.
+#'
+#' @param object bayesian s3 object with mappings set
+#' @param X entire feature matrix
+#' @param y target vector, factor
+#' @param continuous_cols int vector of column positions
+#' @return mean for each column j given a y class label; 'mu|j|y'
+#'
+#' @export
+continuousProbs.bayes <- function(object, X, y, continuous_cols){
+
+    # Retrieve hyperparameters
+
+    kernel <- object$map$kernels['continuous']
+
+    if (kernel != "gaussian") { stop("only 'gaussian' kernel supported") }
+
+    logprobs = list()
+    for (label in object$classes){
+        for (j in object$map$continuous){
+            jmu <- mean(X[y==label,j], na.rm=TRUE)
+            logprobs[[paste0("mu|",as.character(j),"|",label)]] <- jmu
+        }
+    }
+
+    return(logprobs)
 }
 
 #' Prior probability fitting step for Continous/Categorical data
@@ -165,6 +199,12 @@ priorProbs.bayes <- function(object, y) {
     
     return(priors)
 }
+
+#' Conditional probability fitting step for Categorical data
+#'
+categoricalProbs.bayes <- function(object, X, y){
+}
+
 
 #' Fit training data to Bayesian Classifier
 #'
@@ -199,8 +239,7 @@ fit.bayes <- function(object, X, y){
 
     # Compute conditional probs for continuous data
 
-    ypriors <- priorProbs(object, y)
-    logprobs[['continuous']] <- ypriors
+    logprobs[['continuous']] <- continuousProbsProbs(object, X, y)
     
     # Compute conditional probs for categorical data
 
@@ -209,7 +248,7 @@ fit.bayes <- function(object, X, y){
 
     # Compute priors for continuous & categorical data
     
-    logprobs[['priors']] <- ypriors
+    logprobs[['priors']] <- priorProbs(object, y)
 
     # Cache log prior and conditional probabilities
 

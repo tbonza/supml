@@ -113,7 +113,7 @@ test_that("bayes can fit spatial data", {
     map = list(spatial=c(1:ncol(m1)), continuous=c(), categorical=c(),
                kernels=c(spatial="kblock", continuous="gaussian"),
                spatial_priors=list("1"=0.5,"0"=0.5),
-               hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
+               hyperparameters=c(lambda=0.5, kblocks=1))
     b = bayes(map)
     b$classes <- levels(ys)
 
@@ -125,6 +125,22 @@ test_that("bayes can fit spatial data", {
 
     expect_equal(ans[[b$classes[1]]], ans[[b$classes[1]]])
     expect_equal(ans[[b$classes[1]]], log(0.9999))
+})
+
+test_that("bayes can fit continuous data", {
+
+    # bayes object
+    map = list(spatial=c(), continuous=c(1), categorical=c(2),
+               kernels=c(spatial="kblock", continuous="gaussian"),
+               spatial_priors=list("1"=0.5,"0"=0.5),
+               hyperparameters=c(lambda=0.5, kblocks=1))
+    b <- bayes(map)
+    b$classes <- levels(y)
+
+    ans <- continuousProbs(b, X, y)
+
+    expect_equal(ans[['mu|1|0']], mean(X[y==b$classes[1], 1]))
+    expect_equal(ans[['mu|1|1']], mean(X[y==b$classes[2], 1]))
 })
 
 test_that("bayes can fit categorical data", {
