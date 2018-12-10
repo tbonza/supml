@@ -146,13 +146,19 @@ test_that("bayes can fit continuous data", {
 test_that("bayes can fit categorical data", {
 
     # bayes object
-    map = list(spatial=c(), continuous=c(), categorical=c(),
+    map = list(spatial=c(), continuous=c(1), categorical=c(2),
                kernels=c(spatial="kblock", continuous="gaussian"),
                hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
     b = bayes(map)
     b$classes <- levels(y)
 
-    
+    ans <- categoricalProbs(b,X,y)
+
+    expect_equal(length(ans), 4)
+    expect_equal(ans[['0|2|0']], log(2) - log(3))
+    expect_equal(ans[['1|2|0']], log(LOGMIN))
+    expect_equal(ans[['0|2|1']], log(LOGMIN))
+    expect_equal(ans[['1|2|1']], log(LOGMAX))
 })
 
 # Tests related to prior probability intermediate model fitting steps

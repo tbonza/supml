@@ -173,6 +173,48 @@ continuousProbs.bayes <- function(object, X, y, continuous_cols){
     return(logprobs)
 }
 
+#' Conditional probability fitting step for Categorical data
+#'
+#' @return "n|j|label"
+categoricalProbs.bayes <- function(object, X, y){
+
+    logprobs = list()
+    for (label in object$classes){
+        for (j in object$map$categorical){
+
+            Xtrain <- X[y==label,j] 
+            p_jl <- length(Xtrain)
+
+            for (n in levels(Xtrain)){
+
+                p_njl <- sum(Xtrain == n)
+
+                # handle log values correctly
+
+                if (p_njl == p_jl){ # logmax
+                    logprob <- log(LOGMAX)
+                }
+                else if (p_njl == 1){ # logmin
+                    logprob <- log(LOGMIN)
+                }
+                else if (p_njl > 0){ # normal case
+                    logprob <- log(p_njl) - log(p_jl)
+                }
+                else { # class not present, LOGMIN
+                    logprob <- log(LOGMIN)
+                }
+
+                # update log probs
+
+                name <- paste0(n,"|",j,"|",label)
+                logprobs[[name]] <- logprob
+            }
+        }
+    }
+    return(logprobs)
+}
+
+
 #' Prior probability fitting step for Continous/Categorical data
 #' 
 #' Compute prior probs for each class in y. This method
@@ -199,12 +241,6 @@ priorProbs.bayes <- function(object, y) {
     
     return(priors)
 }
-
-#' Conditional probability fitting step for Categorical data
-#'
-categoricalProbs.bayes <- function(object, X, y){
-}
-
 
 #' Fit training data to Bayesian Classifier
 #'
@@ -239,12 +275,11 @@ fit.bayes <- function(object, X, y){
 
     # Compute conditional probs for continuous data
 
-    logprobs[['continuous']] <- continuousProbsProbs(object, X, y)
+    logprobs[['continuous']] <- continuousProbs(object, X, y)
     
     # Compute conditional probs for categorical data
 
-    logprobs[['categorical']] <- categoricalProbs(object,
-                                                  X[,categorical_cols], y)
+    logprobs[['categorical']] <- categoricalProbs(object,X, y)
 
     # Compute priors for continuous & categorical data
     
