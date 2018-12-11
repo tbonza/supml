@@ -376,6 +376,10 @@ predict_proba.bayes <- function(object, X){
 
     proba <- list()
 
+    # Just handle spatial for now
+
+    object <- postSpatialProbs(object, X)
+
     return(object)
 }
 
@@ -387,32 +391,23 @@ predict_proba.bayes <- function(object, X){
 #'
 #' @export
 predict.bayes <- function(object, X){
-    
-    obj <- object
 
     # Log probabilties for each feature by class
 
-    obj <- predict_proba(obj, X)
-    probs <- obj$proba
+    object <- predict_proba(object, X) # only spatial data for now
+    #probs <- obj$proba
 
-    # Find and report class likelihood
+    w <- object$models$spatial$wblocks
+    k <- object$models$spatial$kblocks
+    resolve <- object$models$spatial$resolve
 
-    df <- list()
-    for (name in obj$classes){
+    if (sum(is.na(w)) > 0) { w[is.na(w)] <- 0 }
+    if (sum(is.na(k)) > 0) { k[is.na(k)] <- 0 }
 
-        vec <- c()
-        for (i in probs){
+    clf <- ifelse(k >= w, "1", "0")
+    clf[resolve == 0] <- "none"
 
-            vec <- c(vec, i[[name]])
-        }
-
-        df[[name]] <- vec
-    }
-
-    df <- as.data.frame(df)
-    colnames(df) <- obj$classes
-
-    obj$predictions <- df
+    obj$predictions <- clf
     return(obj)
 }
 

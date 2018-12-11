@@ -242,6 +242,5 @@ test_that("spatial probability predictions are correctly computed", {
 
     expect_true(bans$models$spatial$kblocks[1,1] > 
                 bans$models$spatial$wblocks[1,1])
-    
 })
 
