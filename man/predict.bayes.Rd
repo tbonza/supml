@@ -4,7 +4,7 @@
 \alias{predict.bayes}
 \title{Predict log probabilities for each class K}
 \usage{
-\method{predict}{bayes}(object, ...)
+\method{predict}{bayes}(object, X)
 }
 \arguments{
 \item{object}{s3 object bayes}

@@ -2,18 +2,22 @@
 % Please edit documentation in R/bayes.R
 \name{kernelDensity.bayes}
 \alias{kernelDensity.bayes}
-\title{Gaussian Kernel Density Estimate for Naive Bayes}
+\title{Kernel Density Estimate for Naive Bayes}
 \usage{
-\method{kernelDensity}{bayes}(obj, x, mu = 0)
+\method{kernelDensity}{bayes}(object, x, kernel, ...)
 }
 \arguments{
-\item{obj}{requires instantiated Bayes object}
+\item{object}{requires instantiated Bayes object}
 
-\item{x}{continuous feature vector}
+\item{x}{feature vector}
+
+\item{kernel}{name of kernel ("gaussian", "kblock")}
+
+\item{...}{kernel specific arguments}
 }
 \value{
-fhat, point estimate with gaussian kernel
+kernel estimate
 }
 \description{
-Implements HT (6.23)
+Implements HT (6.23), implements K-Block kernel
 }

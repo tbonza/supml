@@ -4,10 +4,10 @@
 \alias{fit.bayes}
 \title{Fit training data to Bayesian Classifier}
 \usage{
-\method{fit}{bayes}(obj, X, y)
+\method{fit}{bayes}(object, X, y)
 }
 \arguments{
-\item{obj}{bayes s3 object}
+\item{object}{bayes s3 object}
 
 \item{X}{feature matrix}
 
@@ -19,6 +19,7 @@ obj updated bayes s3 object
 \description{
 We want to assign models to each class,
 accounting for continuous and categorical
-variables. We also need the log priors
-to avoid issues with floating point.
+variables. We also handle spatial data.
+Log priors are used to avoide issues with
+floating point.
 }

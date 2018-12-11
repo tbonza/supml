@@ -4,10 +4,10 @@
 \alias{predict_proba.bayes}
 \title{Predicts the log probabilities for each class and feature}
 \usage{
-\method{predict_proba}{bayes}(obj, X)
+\method{predict_proba}{bayes}(object, X)
 }
 \arguments{
-\item{obj}{s3 object, bayes}
+\item{object}{s3 object, bayes}
 
 \item{X}{feature vector}
 }

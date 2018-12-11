@@ -4,12 +4,10 @@
 \alias{bayes}
 \title{Bayesian object}
 \usage{
-bayes(lambda, kernel = "gaussian")
+bayes(map)
 }
 \arguments{
-\item{lambda}{kernel bin width}
-
-\item{kernel, }{string name of kernel to use}
+\item{map}{list of variable types for X}
 }
 \value{
 s3 object, bayes
