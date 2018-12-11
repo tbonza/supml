@@ -16,6 +16,8 @@ continuousProbs <- function(object, X, y) { UseMethod("continuousProbs") }
 categoricalProbs <- function(object, X, y) { UseMethod("categoricalProbs") }
 priorProbs <- function(object, y) { UseMethod("priorProbs") }
 
+postSpatialProbs <- function(object, X) { UseMethod("postSpatialProbs") }
+
 kernelDensity <- function(object, x, kernel, ...) {
     UseMethod("kernelDensity") }
 
@@ -85,7 +87,8 @@ kernelDensity.bayes <- function(object, x, kernel, ...){
 #' Conditional probability fitting step for Spatial data
 #'
 #' This method should only be used for customizing your
-#' own Bayesian classifier.
+#' own Bayesian classifier. Computes p(x_ij|k), p(x_ij|w)
+#' where k = TRUE in k-block.
 #' 
 #' @param object bayesian s3 object with mappings set
 #' @param X boolean spatial feature matrix
@@ -117,19 +120,29 @@ spatialProbs.bayes <- function(object, X, y){
     lnprobs <- list()
     for (label in object$classes){
 
+        # p(X in kblock)
         ksum <- sum(blocks[y==label,])
         tsum <- sum(X[y==label,])
 
-        if (ksum == 0 | tsum == 0){
-            lnprob <- log(LOGMIN)
+        if (tsum == 0){
+            logprobk <- log(LOGMIN)
+            logprobw <- log(LOGMIN)
+        }
+        else if (ksum == 0){
+            logprobk <- log(LOGMIN)
+            logprobw <- log(LOGMAX)
         }
         else if (ksum == tsum){
-            lnprob <- log(LOGMAX)
+            logprobk <- log(LOGMAX)
+            logprobw <- log(LOGMIN)
         }
         else {
-            lnprob <- log(ksum) - log(tsum)
+            logprobk <- log(ksum) - log(tsum)
+            logprobw <- log(tsum - ksum) - log(tsum)
         }
-        lnprobs[[label]] <- lnprob
+        
+        lnprobs[[paste0(label, "|k")]] <- logprobk
+        lnprobs[[paste0(label, "|w")]] <- logprobw
     }
     
     return(lnprobs)
@@ -291,71 +304,79 @@ fit.bayes <- function(object, X, y){
     return(object)
 }
 
-lookup <- function(name, cond=FALSE){
-    if (cond == TRUE){
-        return(paste0("p(", name, "|c)"))
+#' Posterior Spatial probabilties
+#'
+#' Multinomial classification is not currently supported.
+#' Assume m[i,j] is TRUE if FALSE, then
+#' check to see if K-Block kernel evaluates to TRUE.
+#' If K-Block is TRUE, then use conditional probabilities
+#' to determine class membership. 
+#'
+#' @param object s3 bayes object
+#' @param X spatial feature vector
+#' @return matrix of spatial features
+#'
+#' @export
+postSpatialProbs.bayes <- function(object, X){
+
+    # Retrieve hyperparameters
+
+    kernel <- object$map$kernels['spatial']
+    k <- object$map$hyperparameters['kblocks']
+
+    # Compute each x_ij in X
+
+    kblocks <- matrix(NA, nrow=nrow(X), ncol=ncol(X))
+    wblocks <- matrix(NA, nrow=nrow(X), ncol=ncol(X))
+    resolve <- matrix(0, nrow=nrow(X), ncol=ncol(X))
+    name_k0 <- "0|k"
+    name_w0 <- "0|w"
+    name_k1 <- "1|k"
+    name_w1 <- "1|w"
+
+    for (j in 1:ncol(X)){
+
+        for (i in 1:nrow(X)){
+
+            m <- X
+            if (m[i,j] == FALSE){
+
+                m[i,j] <- TRUE
+                estimate <- kernelDensity(object, x=i, kernel=kernel,
+                                          m=m, j=j, k=k)
+                
+                if (estimate == TRUE){
+                    kblocks[i,j] <- object$logpriors$spatial[[name_k1]]
+                    wblocks[i,j] <- object$logpriors$spatial[[name_w1]]
+                }
+                else if (estimate == FALSE){
+                    kblocks[i,j] <- object$logpriors$spatial[[name_k0]]
+                    wblocks[i,j] <- object$logpriors$spatial[[name_w0]]
+                }
+                else { stop("bad estimate received") }
+            }                
+        }
     }
-    else {
-        return(paste0("p(", name, ")"))
-    }
+    resolve[!is.na(kblocks)] <- 1
+    
+    object$models[["spatial"]] <- list(wblocks=wblocks,
+                                       kblocks=kblocks,
+                                       resolve=resolve)
+    return(object)
 }
 
 #' Predicts the log probabilities for each class and feature
 #'
-#' @param obj s3 object, bayes
+#' @param object s3 object, bayes
 #' @param X feature vector
 #' @return bayes s3 object
 #'
 #' @export
-predict_proba.bayes <- function(obj, X){
+predict_proba.bayes <- function(object, X){
 
     proba <- list()
 
-    for (i in 1:nrow(X)){
-
-        proba[[i]] <- list()
-        
-        for (name in obj$classes){
-
-            probs <- c()
-            
-            for (j in 1:ncol(X)){
-
-                val <- X[i,j]
-                prior <- obj$models[[name]][[lookup(name)]]
-
-                probs <- c(probs, log(prior))
-
-                # Categorical
-
-                if (is.factor(val)){
-                    
-                    if (name == val){
-                        cond <- obj$models[[name]][[lookup(j, cond=TRUE)]]
-                        probs <- c(probs, log(cond))
-                    }
-                    else {
-                        # Choose low value other than zero
-                        probs <- c(probs, log(0.1 * 10^(-5)))
-                    }
-                }
-                else if (is.numeric(val)){
-
-                    cond <- obj$models[[name]][[lookup(j, cond=TRUE)]]
-                    mu <- mean(cond)
-                    probs <- c(probs, log(kernelDensity(obj, val, mu)))
-                }
-                else {
-                    stop(sprintf("X vector %.0f is not a Factor or Numeric type", j))
-                }
-            }
-
-            proba[[i]][[name]] <- sum(probs)
-        }
-    }
-    
-    obj$proba <- proba
-    return(obj)
+    return(object)
 }
 
 #' Predict log probabilities for each class K

@@ -119,12 +119,12 @@ test_that("bayes can fit spatial data", {
 
     ans <- spatialProbs(b, X=m1, y=ys)
 
-    expect_equal(length(ans), 2)
+    expect_equal(length(ans), 4)
 
     # check log probabilities (should be equal)
 
     expect_equal(ans[[b$classes[1]]], ans[[b$classes[1]]])
-    expect_equal(ans[[b$classes[1]]], log(0.9999))
+    expect_equal(ans[[paste0(b$classes[1], "|k")]], log(0.9999))
 })
 
 test_that("bayes can fit continuous data", {
@@ -212,12 +212,36 @@ test_that("bayesian model can be fitted", {
     b <- bayes(map)
 
     ans <- fit(b, X=df, y=ys)
-    print(ans)
 
     expect_equal(length(ans), 4)
-    expect_equal(length(ans$logpriors$spatial), 2)
+    expect_equal(length(ans$logpriors$spatial), 4)
     expect_equal(length(ans$logpriors$priors), 2)
     expect_equal(length(ans$logpriors$categorical), 4)
     expect_equal(length(ans$logpriors$continuous), 2)
+})
+
+# Tests related to spatial probability predictions
+
+test_that("spatial probability predictions are correctly computed", {
+
+    # bayes object
+    
+    map = list(spatial=c(1:ncol(m1)), continuous=c(), categorical=c(),
+               kernels=c(spatial="kblock", continuous="gaussian"),
+               spatial_priors=list("1"=0.5,"0"=0.5),
+               hyperparameters=c(lambda=0.5, kblocks=1))
+    b = bayes(map)
+
+    b <- fit(b, m1, ys)
+
+    bans <- postSpatialProbs(b, m1)
+
+    expect_equal(sum(bans$models$spatial$resolve), 6)
+
+    # 0 is the dominant class
+
+    expect_true(bans$models$spatial$kblocks[1,1] > 
+                bans$models$spatial$wblocks[1,1])
+    
 })
 
