@@ -38,7 +38,7 @@ test_that("bayes gaussian kernel density", {
     # bayes object
     lambda <- 0.5
     kernel <- "gaussian"
-    b <- bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     x0 <- 1
     point <- abs(X$a - x0)/lambda
 
@@ -53,7 +53,7 @@ test_that("bayes kblock kernel density, scenario 1",{
 
     # bayes object
     kernel <- "kblock"
-    b = bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     i <- 1:nrow(m1)
     j <- 2
     k <- 1
@@ -67,7 +67,7 @@ test_that("bayes kblock kernel density, scenario 2",{
 
     # bayes object
     kernel <- "kblock"
-    b = bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     i <- 1:nrow(m2)
     j <- 2
     k <- 1
@@ -81,7 +81,7 @@ test_that("bayes kblock kernel density, scenario 3",{
 
     # bayes object
     kernel <- "kblock"
-    b = bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     i <- 1:nrow(m3)
     j <- 2
     k <- 1
@@ -95,7 +95,7 @@ test_that("bayes kblock kernel density, scenario 4",{
 
     # bayes object
     kernel <- "kblock"
-    b = bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     i <- 1:nrow(m4)
     j <- 2
     k <- 1
@@ -113,7 +113,8 @@ test_that("bayes can fit spatial data", {
     map = list(spatial=c(1:ncol(m1)), continuous=c(), categorical=c(),
                kernels=c(spatial="kblock", continuous="gaussian"),
                spatial_priors=list("1"=0.5,"0"=0.5),
-               hyperparameters=c(lambda=0.5, kblocks=1))
+               hyperparameters=c(lambda=0.5, kblocks=1),
+               classes=factor(c("0","1")))
     b = bayes(map)
     b$classes <- levels(ys)
 
@@ -133,7 +134,8 @@ test_that("bayes can fit continuous data", {
     map = list(spatial=c(), continuous=c(1), categorical=c(2),
                kernels=c(spatial="kblock", continuous="gaussian"),
                spatial_priors=list("1"=0.5,"0"=0.5),
-               hyperparameters=c(lambda=0.5, kblocks=1))
+               hyperparameters=c(lambda=0.5, kblocks=1),
+               classes=factor(c("0","1")))
     b <- bayes(map)
     b$classes <- levels(y)
 
@@ -148,7 +150,8 @@ test_that("bayes can fit categorical data", {
     # bayes object
     map = list(spatial=c(), continuous=c(1), categorical=c(2),
                kernels=c(spatial="kblock", continuous="gaussian"),
-               hyperparameters=c(lambda=0.5, mu=0, kblocks=1))
+               hyperparameters=c(lambda=0.5, mu=0, kblocks=1),
+               classes=factor(c("0","1")))
     b = bayes(map)
     b$classes <- levels(y)
 
@@ -167,21 +170,22 @@ test_that("find prior probabilities for continuous/categorical data", {
 
     # Check LOGMAX
 
-    b <- bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     y1 <- factor(c("1","1"))
     ans1 <- priorProbs(b,y1)
     expect_equal(ans1[1,2], log(LOGMAX))
 
     # Check LOGMIN when only one class is present
+    # Always two classes present --
 
-    b <- bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     y2 <- factor(c("0"))
     ans2 <- priorProbs(b,y2)
-    expect_equal(ans2[1,2], log(LOGMIN))
+    expect_equal(ans2[1,2], log(LOGMAX))
 
     # Check general case
 
-    b <- bayes(map=list())
+    b <- bayes(map=list(classes=factor(c("0","1"))))
     y3 <- factor(c("0","1","1"))
     ans3 <- priorProbs(b,y3)
     expect_equal(ans3[1,2], log(LOGMIN))
@@ -207,13 +211,14 @@ test_that("bayesian model can be fitted", {
                categorical=c(ncol(m1) + 2),
                kernels=c(spatial="kblock", continuous="gaussian"),
                spatial_priors=list("1"=0.5,"0"=0.5),
-               hyperparameters=c(lambda=0.5, kblocks=1))
+               hyperparameters=c(lambda=0.5, kblocks=1),
+               classes=factor(c("0","1")))
 
     b <- bayes(map)
 
     ans <- fit(b, X=df, y=ys)
-
-    expect_equal(length(ans), 4)
+    
+    expect_equal(length(ans), 3)
     expect_equal(length(ans$logpriors$spatial), 4)
     expect_equal(length(ans$logpriors$priors), 2)
     expect_equal(length(ans$logpriors$categorical), 4)
@@ -229,7 +234,8 @@ test_that("spatial probability predictions are correctly computed", {
     map = list(spatial=c(1:ncol(m1)), continuous=c(), categorical=c(),
                kernels=c(spatial="kblock", continuous="gaussian"),
                spatial_priors=list("1"=0.5,"0"=0.5),
-               hyperparameters=c(lambda=0.5, kblocks=1))
+               hyperparameters=c(lambda=0.5, kblocks=1),
+               classes=factor(c("0","1")))
     b = bayes(map)
 
     b <- fit(b, m1, ys)
@@ -244,3 +250,31 @@ test_that("spatial probability predictions are correctly computed", {
                 bans$models$spatial$wblocks[1,1])
 })
 
+test_that("Confusion matrix is correctly computed", {
+    Y_true <- matrix(c(TRUE, TRUE, FALSE, FALSE), nrow=2, ncol=2)
+    Y_predict <- matrix(c(TRUE, FALSE, TRUE, FALSE), nrow=2, ncol=2)
+
+    b <- bayes(map=list())
+    b$model$spatial$resolve <- matrix(0, nrow=2, ncol=2)
+
+    ans <- confusionMatrix(b, Y_true, Y_predict)
+
+    expect_equal(sum(ans), 4)
+    expect_equal(ans[1,1], 1)
+    expect_equal(ans[1,2], 1)
+    expect_equal(ans[2,1], 1)
+    expect_equal(ans[2,2], 1)
+})
+
+test_that("Confusion matrix can handle inconsistent table sizes", {
+
+    Y_true <- matrix(c(TRUE, TRUE, FALSE, FALSE), nrow=2, ncol=2)
+    Y_predict <- matrix(c(FALSE, NA, FALSE, FALSE), nrow=2, ncol=2)
+
+    b <- bayes(map=list())
+    b$model$spatial$resolve <- matrix(0, nrow=2, ncol=2)
+
+    ans <- confusionMatrix(b, Y_true, Y_predict)
+
+    expect_equal(sum(ans), 4)
+})

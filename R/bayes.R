@@ -7,22 +7,43 @@ LOGMAX <- 0.9999
 
 # Generic methods
 
+#' @export
 predict_proba <- function(object, X) { UseMethod("predict_proba") }
 
+#' @export
 fit <- function(object, X, y) { UseMethod("fit") }
 
+#' @export
+spatial_fit <- function(object, X, y) { UseMethod("spatial_fit") }
+
+#' @export 
 spatialProbs <- function(object, X,y) { UseMethod("spatialProbs") }
+
+#' @export
 continuousProbs <- function(object, X, y) { UseMethod("continuousProbs") }
+
+#' @export
 categoricalProbs <- function(object, X, y) { UseMethod("categoricalProbs") }
+
+#' @export
 priorProbs <- function(object, y) { UseMethod("priorProbs") }
 
+#' @export
 postSpatialProbs <- function(object, X) { UseMethod("postSpatialProbs") }
 
+#' @export
 kernelDensity <- function(object, x, kernel, ...) {
     UseMethod("kernelDensity") }
 
+#' @export
 score <- function(object, y, probs) { UseMethod("score") }
 
+#' @export
+confusionMatrix <- function(object, Y_true, Y_predict) {
+    UseMethod("confusionMatrix")
+}
+
+#' @export
 gridSearch <- function(object, X, y, ...) { UseMethod("gridSearch") }
 
 #' Bayesian object
@@ -35,7 +56,7 @@ gridSearch <- function(object, X, y, ...) { UseMethod("gridSearch") }
 #'
 #' @export
 bayes <- function(map){
-    value <- list(map = map, classes = c(), models = list(),
+    value <- list(map = map, models = list(),
                   logpriors = list())
     attr(value, "class") <- "bayes"
     return(value)
@@ -118,7 +139,7 @@ spatialProbs.bayes <- function(object, X, y){
     # Compute conditional probs for each class in y
 
     lnprobs <- list()
-    for (label in object$classes){
+    for (label in object$map$classes){
 
         # p(X in kblock)
         ksum <- sum(blocks[y==label,])
@@ -176,7 +197,7 @@ continuousProbs.bayes <- function(object, X, y, continuous_cols){
     if (kernel != "gaussian") { stop("only 'gaussian' kernel supported") }
 
     logprobs = list()
-    for (label in object$classes){
+    for (label in object$map$classes){
         for (j in object$map$continuous){
             jmu <- mean(X[y==label,j], na.rm=TRUE)
             logprobs[[paste0("mu|",as.character(j),"|",label)]] <- jmu
@@ -192,7 +213,7 @@ continuousProbs.bayes <- function(object, X, y, continuous_cols){
 categoricalProbs.bayes <- function(object, X, y){
 
     logprobs = list()
-    for (label in object$classes){
+    for (label in object$map$classes){
         for (j in object$map$categorical){
 
             Xtrain <- X[y==label,j] 
@@ -244,9 +265,25 @@ priorProbs.bayes <- function(object, y) {
     y_count <- as.data.frame(table(y))
     y_len <- length(y)
 
-    y_count['logprobs'] <- log(y_count$Freq) - log(y_len)
-    y_count['logprobs'][y_count$Freq == y_len,] <- log(LOGMAX)
-    y_count['logprobs'][y_count$Freq == 1,] <- log(LOGMIN)
+    cls <- object$map['classes']
+    for (label in setdiff(levels(cls), levels(y))){
+        y_count <- rbind(c(label, 1))
+        y_len <- y_len + 1
+    }
+
+
+    y_count['logprobs'] <- log(LOGMIN)
+    for (i in 1:nrow(y_count)){
+        if (y_count[i,]$Freq == y_len){
+            y_count[i,]$logprobs <- log(LOGMAX)
+        }
+        else if (y_count[i,]$Freq == 1){
+            y_count[i,]$logprobs <- log(LOGMIN)
+        }
+        else {
+            y_count[i,]$logprobs <- log(y_count[i,]$Freq) - log(y_len)
+        }
+    }
 
     priors <- as.data.frame(y_count$y)
     priors <- cbind(priors, y_count$logprobs)
@@ -274,7 +311,6 @@ fit.bayes <- function(object, X, y){
     # Classes
 
     if (!is.factor(y)) { stop("y must be of type Factor") }
-    object$classes <- levels(y)
 
     spatial_cols <- object$map$spatial
 
@@ -295,11 +331,56 @@ fit.bayes <- function(object, X, y){
 
     # Compute priors for continuous & categorical data
     
-    logprobs[['priors']] <- priorProbs(object, y)
+    #logprobs[['priors']] <- priorProbs(object, y)
+    logprobs[['priors']] <- object$map$spatial_priors
 
     # Cache log prior and conditional probabilities
 
     object$logpriors <- logprobs
+
+    return(object)
+}
+
+#' Fit spatial data
+#' 
+#' The conditional priors with a maximum likelihood
+#' are fit to the model using spatial data.
+#'
+#' @param object bayes s3 object
+#' @param X boolean spatial feature matrix
+#' @param Y boolean matrix of same dimensions as X
+#'
+#' @export
+spatial_fit.bayes <- function(object, X, Y){
+
+
+    # Find y with maximum likelihood for class k
+    
+    maxsum <- 0
+    maxj <- 0
+    
+    for (j in 1:ncol(Y)){
+        y <- as.factor(ifelse(Y[,j] == TRUE, "1", "0"))
+
+        logprobs <- spatialProbs(object, X, y)
+
+        candidates <- c()
+        for (label in object$map$classes){
+            name <- paste0(label, "|k")
+            candidates <- c(candidates, logprobs[[name]])
+        }
+        csum <- sum(candidates)
+
+        if (csum >= maxsum){
+            maxsum <- csum
+            maxj <- j
+        }
+    }
+
+    # Fit model based on max y
+
+    y <- as.factor(ifelse(Y[,maxj] == TRUE, "1", "0"))
+    object <- fit(object, X, y)
 
     return(object)
 }
@@ -404,11 +485,12 @@ predict.bayes <- function(object, X){
     if (sum(is.na(w)) > 0) { w[is.na(w)] <- 0 }
     if (sum(is.na(k)) > 0) { k[is.na(k)] <- 0 }
 
-    clf <- ifelse(k >= w, "1", "0")
-    clf[resolve == 0] <- "none"
+    clf <- ifelse(k > w, TRUE, FALSE)
+    clf <- ifelse(k == w, FALSE, TRUE)
+    clf[resolve == 0] <- NA
 
-    obj$predictions <- clf
-    return(obj)
+    object$predictions <- clf
+    return(object)
 }
 
 #' Accuracy scoring function for Binomial Naive Bayes
@@ -428,6 +510,52 @@ score.bayes <- function(obj, y) {
 
     percent_correct <- sum(yhat == y) / length(y)
     return(percent_correct)
+}
+
+#' Confusion matrix for reporting accuracy
+#'
+#' Using an accuracy score when classes are imbalanced
+#' can be really deceiving. A confusion matrix can be
+#' used as an alternative measure of performance. This
+#' confusion matrix expects boolean spatial matrices 
+#' for Y. It uses a 'resolve' matrix to exclude ineligible
+#' predictions. 
+#' 
+#' @param object bayes s3 object
+#' @param Y_true boolean matrix of correct values
+#' @param Y_predict boolean matrix of predicted values
+#' @return 2 by 2 confusion matrix
+#'
+#' @export
+confusionMatrix.bayes <- function(object, Y_true, Y_predict) {
+    tmp <- Y_true[Y_true == Y_predict]
+    resolve <- object$model$spatial$resolve == 0
+
+    correct <- table(tmp[resolve])
+
+    Y_predict[is.na(Y_predict)] <- FALSE
+    incorrect <- table(Y_predict[resolve]) - correct
+
+    confm <- matrix(0, nrow=2, ncol=2)
+    for (name in names(correct)){
+        if (name == TRUE){
+            confm[2,2] <- correct[name]
+        }
+        else {
+            confm[1,2] <- correct[name]
+        }
+    }
+
+    for (name in names(incorrect)){
+        if (name == TRUE){
+            confm[2,1] <- incorrect[name]
+        }
+        else {
+            confm[1,1] <- incorrect[name]
+        }
+    }
+
+    return(confm)
 }
 
 #' Implement grid search for the bayes object
