@@ -8,6 +8,17 @@ vectorization.
 
 See R documentation for basic usage.
 
+## Naive Bayes Classifier for Spatial Data
+
+This model is in the pre-release phase. You will need [devtools](https://github.com/r-lib/devtools)
+in order to use it.
+
+```{r}
+devtools::test()
+devtools::document()
+devtools::install()
+```
+
 ## References
 
 The documentation references three textbooks using the abbreviations
